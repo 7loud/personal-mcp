@@ -1,5 +1,4 @@
 import dotenv from "dotenv";
-dotenv.config();
 
 import express from "express";
 
@@ -10,6 +9,8 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 // Import tools
 import { registerCalendarTools } from "./tools/calendar";
 
+dotenv.config();
+
 // Create server
 const server = new McpServer({
     name: "personal-mcp",
@@ -17,7 +18,7 @@ const server = new McpServer({
     title: "Personal MCP"
 });
 
-let sseTransport: SSEServerTransport | null = null;
+let transports = new Map<string, SSEServerTransport>();
 
 // Register server tools
 registerCalendarTools(server);
@@ -34,7 +35,9 @@ async function main() {
             enableJsonResponse: true,
         });
 
-        res.on("close", transport.close);
+        res.on("close", () => {
+            transport.close();
+        });
 
         await server.connect(transport);
         await transport.handleRequest(req, res, req.body);
@@ -42,35 +45,80 @@ async function main() {
 
     // Intentionally use deprecated SSE endpoint for Poke integration
     app.get("/sse", async (req, res) => {
-        res.setHeader("Content-Type", "text/event-stream");
-        res.setHeader("Cache-Control", "no-cache");
-        res.setHeader("Connection", "keep-alive");
+        const transport = new SSEServerTransport("/message", res);
 
-        sseTransport = new SSEServerTransport("/sse/messages", res);
+        transports.set(transport.sessionId, transport);
+
+        transport.onclose = () => {
+            transports.delete(transport.sessionId);
+        };
 
         res.on("close", () => {
-            if (sseTransport) {
-                sseTransport.close();
-                sseTransport = null;
-            }
+            transport.close();
         });
 
-        await server.connect(sseTransport);
+        await server.connect(transport);
     });
 
-    app.post("/sse/messages", async (req, res) => {
-        if (!sseTransport) {
-            res.status(400).send("No SSE session active");
+    app.post("/message", async (req, res) => {
+        const sessionId = req.query.sessionId as string;
+
+        if (!sessionId) {
+            res.status(400).send("No sessionId");
             return;
         }
 
-        await sseTransport.handlePostMessage(req, res);
+        const transport = transports.get(sessionId);
+
+        if (!transport) {
+            res.status(400).json({
+                jsonrpc: "2.0",
+                error: {
+                    code: -32000,
+                    message: "Bad Request: Unknown or missing MCP session",
+                },
+                id: null,
+            });
+            return;
+        }
+
+        const message = req.body;
+
+        try {
+            await transport.handleMessage(message);
+            res.status(200).end();
+        } catch (err) {
+            console.error("Error in SSE handleMessage:", err);
+            res.status(500).json({
+                jsonrpc: "2.0",
+                error: {
+                    code: -32001,
+                    message: "Internal error while handling SSE message",
+                },
+                id: message?.id ?? null,
+            });
+        }
+    });
+
+    app.get("/", (req, res) => {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(
+            JSON.stringify({
+                name: "Personal MCP",
+                version: process.env.npm_package_version,
+                endpoints: {
+                    sse: "/sse",
+                    message: "/message",
+                },
+                activeConnections: transports.size,
+            })
+        );
     });
 
     const port = parseInt(process.env.PORT || "8000", 10);
 
     app.listen(port, () => {
-            console.log(`Personal MCP listens at http://localhost:${port}/mcp`);
+            console.log(`Personal MCP listens at http://localhost:${port}`);
         })
         .on("error", (error) => {
             console.error("Server error:", error);
