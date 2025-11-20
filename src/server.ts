@@ -4,6 +4,7 @@ dotenv.config();
 import express from "express";
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 
 // Import tools
@@ -15,6 +16,8 @@ const server = new McpServer({
     version: "0.0.0",
     title: "Personal MCP"
 });
+
+let sseTransport: SSEServerTransport | null = null;
 
 // Register server tools
 registerCalendarTools(server);
@@ -35,6 +38,33 @@ async function main() {
 
         await server.connect(transport);
         await transport.handleRequest(req, res, req.body);
+    });
+
+    // Intentionally use deprecated SSE endpoint for Poke integration
+    app.get("/sse", async (req, res) => {
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+
+        sseTransport = new SSEServerTransport("/sse/messages", res);
+
+        res.on("close", () => {
+            if (sseTransport) {
+                sseTransport.close();
+                sseTransport = null;
+            }
+        });
+
+        await server.connect(sseTransport);
+    });
+
+    app.post("/sse/messages", async (req, res) => {
+        if (!sseTransport) {
+            res.status(400).send("No SSE session active");
+            return;
+        }
+
+        await sseTransport.handlePostMessage(req, res);
     });
 
     const port = parseInt(process.env.PORT || "8000", 10);
