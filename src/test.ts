@@ -1,12 +1,12 @@
 import dotenv from "dotenv";
 
-import { listEvents, createEvent, deleteEvent } from "./iCloud/iCloudClient";
+import { listEvents, createEvent, deleteEvent, listCalendars } from "./iCloud/calendar";
 import { buildSimpleEvent, generateUID } from "./iCloud/iCalBuilder";
 
 dotenv.config();
 
 async function main() {
-    console.log("Starte iCloud-Test...");
+    console.log("Starting iCloud-Test...");
 
     // Create a test calendar event
     // The event will be created in the real calendar of the user
@@ -18,14 +18,18 @@ async function main() {
         iCal = buildSimpleEvent({
             uid,
             summary: "MCP Testevent",
-            description: "Erstellt von test.ts",
-            location: "Zuhause",
+            description: "Created by Personal MCP testing script",
+            location: "Everywhere and Nowhere",
             start: now,
             end: inOneHour,
         });
 
+    const calendarURL = (await listCalendars())[0].url;
+
     console.log("Creating test event with UID:", uid);
-    await createEvent(iCal, filename);
+
+    await createEvent(calendarURL, iCal, filename);
+
     console.log("Event created successfully.");
 
     // Check for events from now until in one hour
@@ -33,8 +37,11 @@ async function main() {
         to = new Date(inOneHour.getTime() + 5 * 60 * 1000).toISOString();
 
     console.log("List of events between", from, "and", to);
-    const events = await listEvents(from, to);
-    console.log(`Found events: ${events.length}`);
+
+    const eventsByCalendars = await listEvents(from, to, "all"),
+        events = eventsByCalendars.flatMap(c => c.events);
+
+    console.log(`Found ${events.length} event(s) in calendar.`);
 
     const created = events.find(e => e.iCal.includes(uid));
 

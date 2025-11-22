@@ -1,6 +1,6 @@
 import crypto from "crypto";
 
-import type { BuildEventOptions } from "../@types/BuildEventOptions";
+import type { BuildEventOptions } from "../@types/calendar";
 
 export function toICalDateTimeUTC(date: Date): string {
     const y = date.getUTCFullYear();

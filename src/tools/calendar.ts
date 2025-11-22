@@ -5,17 +5,40 @@ import {
     createEvent,
     updateEvent,
     deleteEvent,
-} from "../iCloud/iCloudClient";
+    listCalendars
+} from "../iCloud/calendar";
 
 import {
     buildSimpleEvent,
-    generateUID,
+    generateUID
 } from "../iCloud/iCalBuilder";
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { BuildEventOptions } from "../@types/BuildEventOptions";
+import type { BuildEventOptions } from "../@types/calendar";
 
 export function registerCalendarTools(server: McpServer) {
+    // List calendars
+    server.registerTool(
+        "list_calendars",
+        {
+            description: "Returns a list of all iCloud calendars.",
+            inputSchema: {}
+        },
+        async () => {
+            const calendars = await listCalendars(),
+                output = { calendars };
+
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: JSON.stringify(output),
+                    },
+                ],
+            };
+        }
+    );
+
     // List calendar events
     server.registerTool(
         "calendar_list_events",
@@ -24,10 +47,13 @@ export function registerCalendarTools(server: McpServer) {
             inputSchema: {
                 from: z.string().describe("Start time as ISO-String (incl. timezone)"),
                 to: z.string().describe("End time as ISO-String (incl. timezone)"),
+                useCalendars: z.union([z.literal("all"), z.array(z.string())])
+                    .optional()
+                    .describe("List of calendar URLs to query, or 'all' to use all calendars.")
             },
         },
-        async ({ from, to }: { from: string, to: string}) => {
-            const events = await listEvents(from, to),
+        async ({ from, to, useCalendars }: { from: string, to: string, useCalendars?: "all" | string[]}) => {
+            const events = await listEvents(from, to, useCalendars ?? "all"),
                 output = { events };
 
             return {
@@ -47,6 +73,7 @@ export function registerCalendarTools(server: McpServer) {
         {
             description: "Creates a new iCloud calendar event. Returns the created event's UID and filename.",
             inputSchema: {
+                url: z.string().describe("Calendar iCloud-CalDAV-URL"),
                 summary: z.string().describe("Event title"),
                 description: z.string().optional(),
                 location: z.string().optional(),
@@ -54,7 +81,7 @@ export function registerCalendarTools(server: McpServer) {
                 end: z.string().describe("End (ISO-String)"),
             },
         },
-        async ({ summary, description, location, start, end }) => {
+        async ({ url, summary, description, location, start, end }) => {
             const opts: BuildEventOptions = {
                 summary,
                 description,
@@ -67,7 +94,7 @@ export function registerCalendarTools(server: McpServer) {
                 filename = `${uid}.ics`,
                 iCal = buildSimpleEvent({ ...opts, uid });
 
-            await createEvent(iCal, filename);
+            await createEvent(url, iCal, filename);
 
             const output = { success: true, uid, filename };
 
