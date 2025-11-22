@@ -50,11 +50,19 @@ export function registerCalendarTools(server: McpServer) {
                 useCalendars: z.union([z.literal("all"), z.array(z.string())])
                     .optional()
                     .describe("List of calendar URLs to query, or 'all' to use all calendars.")
-            },
+            }
         },
         async ({ from, to, useCalendars }: { from: string, to: string, useCalendars?: "all" | string[]}) => {
             const events = await listEvents(from, to, useCalendars ?? "all"),
-                output = { events };
+                flatEvents = events.flatMap(({ calendar, events }) =>
+                    events.map((ev) => ({
+                        eventUrl: ev.url,
+                        calendarUrl: calendar.url,
+                        etag: ev.etag,
+                        iCal: ev.iCal,
+                    }))
+                ),
+                output = { events: flatEvents };
 
             return {
                 content: [
