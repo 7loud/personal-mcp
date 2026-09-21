@@ -14,7 +14,6 @@ import {
 } from "../iCloud/iCalBuilder";
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { BuildEventOptions } from "../@types/calendar";
 
 export function registerCalendarTools(server: McpServer) {
     // List calendars
