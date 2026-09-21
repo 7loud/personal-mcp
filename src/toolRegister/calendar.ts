@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import {
     listEvents,
-    createEvent,
+    createEvents,
     updateEvent,
     deleteEvent,
     listCalendars
@@ -96,39 +96,61 @@ export function registerCalendarTools(server: McpServer) {
         }
     );
 
-    // Create calendar event
-    server.registerTool("icloud-calendar_create_event", {
-            description: "Creates a new iCloud calendar event. Returns the created event's UID and filename.",
+    server.registerTool("icloud-calendar_create_events", {
+            description: "Creates one or more iCloud calendar events. Returns the UID, filename and success state for each created event.",
             inputSchema: z.object({
-                url: z.string().describe("Calendar iCloud-CalDAV-URL"),
-                summary: z.string().describe("Event title"),
-                description: z.string().optional(),
-                location: z.string().optional(),
-                start: z.string().describe("Start (ISO-String)"),
-                end: z.string().describe("End (ISO-String)")
+                events: z.array(
+                    z.object({
+                        url: z.string().describe("Calendar iCloud-CalDAV-URL"),
+                        summary: z.string().describe("Event title"),
+                        description: z.string().optional().describe("Event description"),
+                        location: z.string().optional().describe("Event location"),
+                        timezone: z.string().optional().describe("Optional timezone (IANA format, e.g., 'America/New_York'). If not provided, UTC will be used."),
+                        start: z.string().describe("Start (ISO-String)"),
+                        end: z.string().describe("End (ISO-String)"),
+                    })
+                )
             }),
             outputSchema: z.object({
-                success: z.literal(true),
-                uid: z.string(),
-                filename: z.string()
+                events: z.array(
+                    z.object({
+                        success: z.boolean().describe("Indicates whether the event was successfully created."),
+                        uid: z.string().describe("The unique identifier (UID) of the created event."),
+                        filename: z.string().describe("The filename of the created event."),
+                    })
+                )
             })
         },
-        async ({ url, summary, description, location, start, end }) => {
-            const opts: BuildEventOptions = {
-                summary,
-                description,
-                location,
-                start: new Date(start),
-                end: new Date(end)
-            };
+        async ({events}) => {
+            const structuredContent: { events: { success: boolean; uid: string; filename: string }[] } = { events: [] };
 
-            const uid = generateUID(),
-                filename = `${uid}.ics`,
-                iCal = buildSimpleEvent({ ...opts, uid });
+            const eventsByCalendar = events.reduce((acc, event) => {
+                if (!acc[event.url]) acc[event.url] = [];
+                acc[event.url].push(event);
+                return acc;
+            }, {} as Record<string, typeof events>);
 
-            await createEvent(url, iCal, filename);
+            for (const [calendarUrl, events] of Object.entries(eventsByCalendar)) {
+                const eventsToCreate = events.map(event => {
+                    const uid = generateUID(),
+                        filename = `${uid}.ics`,
+                        iCal = buildSimpleEvent({
+                            summary: event.summary,
+                            description: event.description,
+                            location: event.location,
+                            timezone: event.timezone,
+                            start: new Date(event.start),
+                            end: new Date(event.end),
+                            uid
+                        });
 
-            const structuredContent = { success: true as const, uid, filename };
+                    return { iCalData: iCal, uid, filename };
+                });
+
+                const createdEvents = await createEvents(calendarUrl, eventsToCreate);
+
+                structuredContent.events.push(...createdEvents);
+            }
 
             return {
                 content: [

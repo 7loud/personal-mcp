@@ -10,9 +10,10 @@
     "test-local": "ts-node src/test.ts"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.25.2",
+    "@modelcontextprotocol/sdk": "1.26.0",
     "dotenv": "^16.4.0",
     "express": "^5.1.0",
+    "timezones-ical-library": "^2.3.2",
     "tsdav": "^2.0.0",
     "zod": "^3.25.76"
   },

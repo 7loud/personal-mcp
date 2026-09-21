@@ -76,17 +76,25 @@ export async function listEvents(fromISO: string, toISO: string, useCalendars: "
     return result;
 }
 
-export async function createEvent(calendarUrl: string, iCalData: string, filename: string): Promise<void> {
+export async function createEvents(calendarUrl: string, events: { iCalData: string, uid: string, filename: string }[]): Promise<{ success: true, uid: string, filename: string }[]> {
     const client = await getDavClient("caldav"),
         calendar = await findCalendarByUrl(calendarUrl);
 
     if (!calendar) throw new Error(`Calendar with URL "${calendarUrl}" not found`);
 
-    await client.createCalendarObject({
-        calendar,
-        iCalString: iCalData,
-        filename,
-    });
+    const structuredContent: { success: true, uid: string, filename: string }[] = [];
+
+    for (const event of events) {
+        await client.createCalendarObject({
+            calendar,
+            iCalString: event.iCalData,
+            filename: event.filename,
+        });
+
+        structuredContent.push({ success: true, uid: event.uid, filename: event.filename });
+    }
+
+    return structuredContent;
 }
 
 export async function updateEvent(url: string, iCalData: string, etag?: string): Promise<void> {
