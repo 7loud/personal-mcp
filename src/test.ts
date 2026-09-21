@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
 
-import { listEvents, createEvent, deleteEvent, listCalendars } from "./iCloud/calendar";
+import { listEvents, createEvents, deleteEvent, listCalendars } from "./iCloud/calendar";
 import { buildSimpleEvent, generateUID } from "./iCloud/iCalBuilder";
 
 dotenv.config();
@@ -15,7 +15,7 @@ async function main() {
 
     const uid = generateUID(),
         filename = `${uid}.ics`,
-        iCal = buildSimpleEvent({
+        iCalData = buildSimpleEvent({
             uid,
             summary: "MCP Testevent",
             description: "Created by Personal MCP testing script",
@@ -28,7 +28,7 @@ async function main() {
 
     console.log("Creating test event with UID:", uid);
 
-    await createEvent(calendarURL, iCal, filename);
+    await createEvents(calendarURL, [{iCalData, uid, filename}]);
 
     console.log("Event created successfully.");
 
