@@ -76,47 +76,82 @@ export async function listEvents(fromISO: string, toISO: string, useCalendars: "
     return result;
 }
 
-export async function createEvents(calendarUrl: string, events: { iCalData: string, uid: string, filename: string }[]): Promise<{ success: true, uid: string, filename: string }[]> {
+export async function createEvents(calendarUrl: string, events: { iCalData: string, uid: string, filename: string }[]): Promise<{ success: boolean, uid: string, filename: string }[]> {
     const client = await getDavClient("caldav"),
         calendar = await findCalendarByUrl(calendarUrl);
 
     if (!calendar) throw new Error(`Calendar with URL "${calendarUrl}" not found`);
 
-    const structuredContent: { success: true, uid: string, filename: string }[] = [];
+    const structuredContent: { success: boolean, uid: string, filename: string }[] = [];
 
     for (const event of events) {
         await client.createCalendarObject({
             calendar,
             iCalString: event.iCalData,
             filename: event.filename,
-        });
+        }).then((res) => {
+            const success = res.status === 201 || res.status === 204;
 
-        structuredContent.push({ success: true, uid: event.uid, filename: event.filename });
+            structuredContent.push({ success, uid: event.uid, filename: event.filename });
+
+            if (!res || !res.url || !success) throw new Error(`Failed to create event with UID "${event.uid}"`);
+        }).catch((err) => {
+            console.error("Error creating event:", err);
+            structuredContent.push({ success: false, uid: event.uid, filename: event.filename });
+        });
     }
 
     return structuredContent;
 }
 
-export async function updateEvent(url: string, iCalData: string, etag?: string): Promise<void> {
+export async function updateEvents(url: string, events: { iCalData: string, etag?: string }[]): Promise<{ success: boolean, etag?: string, iCalData: string }[]> {
     const client = await getDavClient("caldav"),
-        calendarObject: DAVCalendarObject = {
-            url,
-            data: iCalData,
-            ...(etag ? { etag } : {}),
-        };
+        structuredContent: { success: boolean, etag?: string, iCalData: string }[] = [];
 
-    await client.updateCalendarObject({
-        calendarObject,
-    });
+    for (const event of events) {
+        await client.updateCalendarObject({
+            calendarObject: {
+                url,
+                data: event.iCalData,
+                etag: event.etag,
+            },
+        }).then((res) => {
+            const success = res.status === 200 || res.status === 204;
+
+            structuredContent.push({ success, etag: event.etag, iCalData: event.iCalData });
+
+            if (!res || !res.url || !success) throw new Error(`Failed to update event with URL "${url}"`);
+        }).catch((err) => {
+            console.error("Error updating event:", err);
+            structuredContent.push({ success: false, etag: event.etag, iCalData: event.iCalData });
+        });
+    }
+
+    return structuredContent;
 }
 
-export async function deleteEvent(url: string): Promise<void> {
+export async function deleteEvents(url: string[]): Promise<{ success: boolean; url: string }[]> {
     const client = await getDavClient("caldav"),
-        calendarObject: DAVCalendarObject = {
-            url,
+        structuredContent: { success: boolean, url: string }[] = [];
+
+    for (const singleURL of url) {
+        const calendarObject: DAVCalendarObject = {
+            url: singleURL,
         };
 
-    await client.deleteCalendarObject({
-        calendarObject,
-    });
+        await client.deleteCalendarObject({
+            calendarObject,
+        }).then((res) => {
+            const success = res.status === 200 || res.status === 204;
+
+            structuredContent.push({ success, url: singleURL });
+
+            if (!res || !res.url || !success) throw new Error(`Failed to delete event with URL "${singleURL}"`);
+        }).catch((err) => {
+            console.error("Error deleting event:", err);
+            structuredContent.push({ success: false, url: singleURL });
+        });
+    }
+
+    return structuredContent;
 }

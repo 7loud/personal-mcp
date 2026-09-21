@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
 
-import { listEvents, createEvents, deleteEvent, listCalendars } from "./iCloud/calendar";
+import { listEvents, createEvents, deleteEvents, listCalendars } from "./iCloud/calendar";
 import { buildSimpleEvent, generateUID } from "./iCloud/iCalBuilder";
 
 dotenv.config();
@@ -13,47 +13,63 @@ async function main() {
     const now = new Date(),
         inOneHour = new Date(now.getTime() + 60 * 60 * 1000);
 
-    const uid = generateUID(),
-        filename = `${uid}.ics`,
-        iCalData = buildSimpleEvent({
-            uid,
-            summary: "MCP Testevent",
-            description: "Created by Personal MCP testing script",
-            location: "Everywhere and Nowhere",
-            start: now,
-            end: inOneHour,
-        });
+    const events = [
+        {
+            summary: "MCP Testevent w/o Timezone"
+        },
+        {
+            summary: "MCP Testevent w/ Timezone",
+            timezone: "Europe/Berlin"
+        }
+    ];
 
-    const calendarURL = (await listCalendars())[0].url;
+    for (const event of events) {
+        const uid = generateUID(),
+            filename = `${uid}.ics`,
+            iCalData = buildSimpleEvent({
+                uid,
+                summary: event.summary,
+                description: "Created by Personal MCP testing script",
+                location: "Everywhere and Nowhere",
+                timezone: event.timezone,
+                start: now,
+                end: inOneHour,
+            });
 
-    console.log("Creating test event with UID:", uid);
+        const calendarURL = (await listCalendars())[0].url;
 
-    await createEvents(calendarURL, [{iCalData, uid, filename}]);
+        console.log(`Creating test event (${event.summary}) with UID: ${uid}`);
 
-    console.log("Event created successfully.");
+        await createEvents(calendarURL, [{iCalData, uid, filename}]);
 
-    // Check for events from now until in one hour
-    const from = new Date(now.getTime() - 5 * 60 * 1000).toISOString(),
-        to = new Date(inOneHour.getTime() + 5 * 60 * 1000).toISOString();
+        console.log("Event created successfully.");
 
-    console.log("List of events between", from, "and", to);
+        // Check for events from now until in one hour
+        const from = new Date(now.getTime() - 5 * 60 * 1000).toISOString(),
+            to = new Date(inOneHour.getTime() + 5 * 60 * 1000).toISOString();
 
-    const eventsByCalendars = await listEvents(from, to, "all"),
-        events = eventsByCalendars.flatMap(c => c.events);
+        console.log("List of events between", from, "and", to);
 
-    console.log(`Found ${events.length} event(s) in calendar.`);
+        const eventsByCalendars = await listEvents(from, to, "all"),
+            events = eventsByCalendars.flatMap(c => c.events);
 
-    const created = events.find(e => e.iCal.includes(uid));
+        console.log(`Found ${events.length} event(s) in calendar.`);
 
-    if (created) {
-        console.log("Found test event by URL:", created.url);
+        const created = events.find(e => e.iCal.includes(uid));
 
-        // Delete the created test event
-        console.log("Deleting test event...");
-        await deleteEvent(created.url);
-        console.log("Deleted test event successfully.");
-    } else
-        console.log("Could not find test event in list.");
+        if (created) {
+            console.log("Found test event by URL:", created.url);
+
+            // Delete the created test event
+            console.log("Deleting test event...");
+
+            if ((await deleteEvents([created.url]))[0].success)
+                console.log("Deleted test event successfully.");
+            else
+                console.log("Failed to delete test event.");
+        } else
+            console.log("Could not find test event in list.");
+    }
 
     console.log("Finished.");
 }
