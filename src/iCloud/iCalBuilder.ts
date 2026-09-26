@@ -88,8 +88,8 @@ function getTimeBlocks(start: Date, end: Date, timezone?: string): { dtStart: st
             dtEnd = toICalDateTime(end, timezone);
 
         return {
-            dtStart: `DTSTART;${dateTimeBlock[1]}:${dtStart}`,
-            dtEnd: `DTEND;${dateTimeBlock[1]}:${dtEnd}`,
+            dtStart: `DTSTART;TZID=${dateTimeBlock[1]}:${dtStart}`,
+            dtEnd: `DTEND;TZID=${dateTimeBlock[1]}:${dtEnd}`,
             tzBlock: dateTimeBlock[0],
         };
     }
