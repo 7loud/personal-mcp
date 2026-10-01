@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 
 import { listEvents, createEvents, deleteEvents, listCalendars } from "./iCloud/calendar";
-import { buildSimpleEvent, generateUID, toICalDateTime } from "./iCloud/iCalBuilder";
+import { buildSimpleEvent, generateUID } from "./iCloud/iCalBuilder";
 
 dotenv.config();
 
