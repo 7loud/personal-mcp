@@ -5,12 +5,13 @@ import type { BuildEventOptions } from "../@types/calendar";
 
 /**
     @description Converts a Date object to an iCal date-time string in the format YYYYMMDDTHHMMSS. If utc is true, the date-time will be in UTC and will have a "Z" suffix.
-    @param date - The Date object to convert.
+    @param dateString - The Date object to convert.
     @param timeZone - Optional. The IANA timezone string (e.g., "America/New_York"). If not provided, the date-time will be in UTC.
     @returns The iCal date-time string.
  */
-export function toICalDateTime(date: Date, timeZone?: string): string {
+export function toICalDateTime(dateString?: string, timeZone?: string): string {
     if (!timeZone || timeZone.toUpperCase() === "UTC") {
+        const date = dateString ? new Date(dateString) : new Date();
         const y = date.getUTCFullYear();
         const m = (date.getUTCMonth() + 1).toString().padStart(2, "0");
         const d = date.getUTCDate().toString().padStart(2, "0");
@@ -21,21 +22,12 @@ export function toICalDateTime(date: Date, timeZone?: string): string {
         return `${y}${m}${d}T${hh}${mm}${ss}Z`;
     }
 
-    const formatter = new Intl.DateTimeFormat("en-GB", {
-        timeZone,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hourCycle: "h23",
-    });
+    if (dateString) {
+        if (isNaN(new Date(dateString).getTime())) throw new Error(`Invalid date string: ${dateString}`);
 
-    const parts = formatter.formatToParts(date);
-    const p = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-
-    return `${p.year}${p.month}${p.day}T${p.hour}${p.minute}${p.second}`;
+        return dateString.replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+    } else
+        throw new Error("toICalDateTime: dateString is required when timezone is specified.");
 }
 
 export function generateUID(): string {
@@ -48,7 +40,7 @@ export function buildSimpleEvent(options: BuildEventOptions): string {
     const uid = options.uid ?? generateUID();
 
     // DTSTAMP is the timestamp of when the event was created, in UTC
-    const dtStamp = toICalDateTime(new Date()),
+    const dtStamp = toICalDateTime(),
         timeData = getTimeBlocks(options.start, options.end, options.timezone);
 
     const lines: string[] = [
@@ -81,15 +73,16 @@ export function buildSimpleEvent(options: BuildEventOptions): string {
     return lines.join("\r\n");
 }
 
-function getTimeBlocks(start: Date, end: Date, timezone?: string): { dtStart: string; dtEnd: string; tzBlock?: string } {
+function getTimeBlocks(start: string, end: string, timezone?: string): { dtStart: string; dtEnd: string; tzBlock?: string } {
     if (timezone) {
         const dateTimeBlock = tzlib_get_ical_block(timezone),
             dtStart = toICalDateTime(start, timezone),
             dtEnd = toICalDateTime(end, timezone);
 
+        // Important: dateTimeBlock[1] contains the TZID parameter for DTSTART and DTEND, e.g., "TZID=Europe/Berlin"
         return {
-            dtStart: `DTSTART;TZID=${dateTimeBlock[1]}:${dtStart}`,
-            dtEnd: `DTEND;TZID=${dateTimeBlock[1]}:${dtEnd}`,
+            dtStart: `DTSTART;${dateTimeBlock[1]}:${dtStart}`,
+            dtEnd: `DTEND;${dateTimeBlock[1]}:${dtEnd}`,
             tzBlock: dateTimeBlock[0],
         };
     }

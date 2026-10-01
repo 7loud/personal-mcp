@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 
 import { listEvents, createEvents, deleteEvents, listCalendars } from "./iCloud/calendar";
-import { buildSimpleEvent, generateUID } from "./iCloud/iCalBuilder";
+import { buildSimpleEvent, generateUID, toICalDateTime } from "./iCloud/iCalBuilder";
 
 dotenv.config();
 
@@ -15,11 +15,15 @@ async function main() {
 
     const events = [
         {
-            summary: "MCP Testevent w/o Timezone"
+            summary: "MCP Testevent UTC",
+            start: now.toISOString(),
+            end: inOneHour.toISOString()
         },
         {
             summary: "MCP Testevent w/ Timezone",
-            timezone: "Europe/Berlin"
+            timezone: "Europe/Berlin",
+            start: toLocalISOString(now),
+            end: toLocalISOString(inOneHour)
         }
     ];
 
@@ -30,10 +34,10 @@ async function main() {
                 uid,
                 summary: event.summary,
                 description: "Created by Personal MCP testing script",
-                location: "Everywhere and Nowhere",
+                location: "Earth",
                 timezone: event.timezone,
-                start: now,
-                end: inOneHour,
+                start: event.start,
+                end: event.end
             });
 
         const calendarURL = (await listCalendars())[0].url;
@@ -72,6 +76,16 @@ async function main() {
     }
 
     console.log("Finished.");
+}
+
+/**
+ * Converts a date to a local ISO string without converting it to UTC. This is useful for creating events in a specific timezone.
+ * @param date The date to convert.
+ * @returns The local ISO string representation of the date.
+ */
+function toLocalISOString(date: Date): string {
+    const tzOffset = date.getTimezoneOffset() * 60000;
+    return new Date(date.getTime() - tzOffset).toISOString().slice(0, -1);
 }
 
 main().catch(err => {

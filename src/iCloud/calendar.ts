@@ -2,6 +2,7 @@ import { getDavClient } from "./iCloudClient";
 
 import type { DAVCalendar, DAVCalendarObject, DAVObject } from "tsdav";
 import type { SimpleEvent, PublicCalendar, EventsByCalendar } from "../@types/calendar";
+import debugLog from "../util/debugLog";
 
 async function fetchAllCalendars(): Promise<DAVCalendar[]> {
     const client = await getDavClient("caldav"),
@@ -93,10 +94,17 @@ export async function createEvents(calendarUrl: string, events: { iCalData: stri
             const success = res.status === 201 || res.status === 204;
 
             structuredContent.push({ success, uid: event.uid, filename: event.filename });
+            debugLog(`Created event with UID "${event.uid}". Status ${res.status} ${res.statusText}`);
 
-            if (!res || !res.url || !success) throw new Error(`Failed to create event with UID "${event.uid}"`);
+            if (!res || !res.url || !success) {
+                debugLog("Failed to create event with UID:", event.uid);
+                debugLog("iCalData:", event.iCalData);
+                debugLog("Response:", res);
+
+                throw new Error(`Failed to create event with UID "${event.uid}". Status ${res.status} ${res.statusText}`);
+            }
         }).catch((err) => {
-            console.error("Error creating event:", err);
+            debugLog("Error creating event:", err);
             structuredContent.push({ success: false, uid: event.uid, filename: event.filename });
         });
     }

@@ -52,8 +52,8 @@ export function registerCalendarTools(server: McpServer) {
     server.registerTool("icloud-calendar_list_events", {
             description: "Returns a list of all iCloud calendar events within a specified time range.",
             inputSchema: z.object({
-                from: z.string().describe("Start time as ISO-String (incl. timezone)"),
-                to: z.string().describe("End time as ISO-String (incl. timezone)"),
+                from: z.string().describe("Start date-time as ISO-String, incl. timezone if applicable"),
+                to: z.string().describe("End date-time as ISO-String, incl. timezone if applicable"),
                 useCalendars: z
                     .union([z.literal("all"), z.array(z.string())])
                     .describe(
@@ -105,8 +105,8 @@ export function registerCalendarTools(server: McpServer) {
                         description: z.string().optional().describe("Event description"),
                         location: z.string().optional().describe("Event location"),
                         timezone: z.string().optional().describe("Optional timezone (IANA format, e.g., 'America/New_York'). If not provided, UTC will be used."),
-                        start: z.string().describe("Start (ISO-String)"),
-                        end: z.string().describe("End (ISO-String)"),
+                        start: z.string().describe("Start date-time as ISO-String, incl. timezone if applicable"),
+                        end: z.string().describe("End date-time as ISO-String, incl. timezone if applicable"),
                     })
                 )
             }),
@@ -138,8 +138,8 @@ export function registerCalendarTools(server: McpServer) {
                             description: event.description,
                             location: event.location,
                             timezone: event.timezone,
-                            start: new Date(event.start),
-                            end: new Date(event.end),
+                            start: event.start,
+                            end: event.end,
                             uid
                         });
 
@@ -172,8 +172,8 @@ export function registerCalendarTools(server: McpServer) {
                     description: z.string().optional().describe("New event description. If not provided, the description will be cleared."),
                     location: z.string().optional().describe("New event location. If not provided, the location will be cleared."),
                     timezone: z.string().optional().describe("New timezone (IANA format, e.g., 'America/New_York'). If not provided, UTC will be used."),
-                    start: z.string().describe("New start (ISO-String)."),
-                    end: z.string().describe("New end (ISO-String)."),
+                    start: z.string().describe("New start date-time as ISO-String, incl. timezone if applicable"),
+                    end: z.string().describe("New end date-time as ISO-String, incl. timezone if applicable"),
                     etag: z.string().optional().describe("Optional ETag from listEvents")
                 }))
             }),
@@ -201,8 +201,8 @@ export function registerCalendarTools(server: McpServer) {
                             description: event.description,
                             location: event.location,
                             timezone: event.timezone,
-                            start: new Date(event.start),
-                            end: new Date(event.end)
+                            start: event.start,
+                            end: event.end
                         });
 
                     return { iCalData: iCal, etag: event.etag };

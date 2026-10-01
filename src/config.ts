@@ -23,6 +23,7 @@ export const ALLOWED_HOSTS = new Set(
 
 export const PORT = Number(process.env.PORT ?? 4242);
 export const VER = Number(process.env.npm_package_version);
+export const DEBUG = process.env.DEBUG === "true";
 
 export const PMCP_ENABLE_CALENDAR = process.env.PMCP_ENABLE_CALENDAR === "true";
 export const PMCP_ENABLE_CONTACTS = process.env.PMCP_ENABLE_CONTACTS === "true";
