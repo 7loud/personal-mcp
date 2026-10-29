@@ -1,3 +1,5 @@
+### Public version now available! [thefredlab/icloud-mcp](https://github.com/thefredlab/icloud-mcp)
+
 # Personal MCP Server
 
 A personal Model Context Protocol (MCP) server that provides calendar integration with iCloud through CalDAV protocol.
